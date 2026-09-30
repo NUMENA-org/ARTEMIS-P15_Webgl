@@ -4,67 +4,317 @@
 <head>
 	<meta charset="utf-8">
 	<meta http-equiv="Content-Type" content="text/html; charset=utf-8">
+	<meta name="viewport" content="width=device-width, height=device-height, initial-scale=1.0, user-scalable=no, shrink-to-fit=yes">
+	<meta name="theme-color" content="#0E2138">
 	<title>ARTEMIS-P15</title>
+	<link rel="preload" href="logo.png" as="image">
 	<style>
+		/* Colours mirror the in-app UI Toolkit tokens (P15 design system). */
+		:root {
+			--brand-blue: #1B3C63;
+			--brand-deep: #0A1320;
+			--accent: #E2BE78;
+			--accent-soft: rgba(226, 190, 120, 0.18);
+			--cream: #F5DFB5;
+			--text: #F4EFE6;
+			--text-muted: rgba(244, 239, 230, 0.55);
+			--danger: #EB7A6E;
+		}
+
 		html,
 		body {
-			background-color: #1A3C62;
-			background-image: url('background.jpg');
-			background-repeat: no-repeat;
-			background-position: center center;
-			background-attachment: fixed;
 			width: 100%;
 			height: 100%;
-			overflow: hidden;
-			padding: 0;
 			margin: 0;
-		}
-
-		/* Loading: show entire image and canvas area (letterbox if needed). */
-		body.webgl-loading {
-			background-size: contain;
-		}
-
-		/* Running: full-bleed background (same as before load completes). */
-		body.webgl-loaded {
-			background-size: cover;
-		}
-
-		div#gameContainer {
-			background: transparent !important;
-			position: fixed;
-			top: 0;
-			left: 0;
+			padding: 0;
 			overflow: hidden;
+			background: var(--brand-deep);
+			color: var(--text);
+			font-family: "Segoe UI", system-ui, -apple-system, "Helvetica Neue", Arial, sans-serif;
 		}
 
-		div#gameContainer canvas {
-			position: absolute;
+		#unity-container {
+			position: fixed;
+			inset: 0;
+		}
+
+		#unity-canvas {
+			display: block;
+			width: 100%;
+			height: 100%;
+			background: transparent;
 			-webkit-user-select: none;
 			user-select: none;
+			outline: none;
 		}
 
-		div#gameContainer canvas[data-pixel-art="true"] {
-			position: absolute;
-			image-rendering: optimizeSpeed;
-			image-rendering: -webkit-crisp-edges;
-			image-rendering: -moz-crisp-edges;
-			image-rendering: -o-crisp-edges;
-			image-rendering: crisp-edges;
-			image-rendering: -webkit-optimize-contrast;
-			image-rendering: optimize-contrast;
+		#unity-canvas[data-pixel-art="true"] {
 			image-rendering: pixelated;
-			-ms-interpolation-mode: nearest-neighbor;
+			image-rendering: crisp-edges;
+		}
+
+		/* ---------- Loading screen ---------- */
+
+		#loader {
+			position: fixed;
+			inset: 0;
+			z-index: 10;
+			display: flex;
+			flex-direction: column;
+			align-items: center;
+			justify-content: center;
+			padding: 24px;
+			box-sizing: border-box;
+			background:
+				radial-gradient(ellipse 70% 60% at 50% 42%, rgba(43, 86, 138, 0.55), transparent 70%),
+				linear-gradient(180deg, var(--brand-blue) 0%, #12294A 55%, var(--brand-deep) 100%);
+			transition: opacity 600ms ease, visibility 0s linear 600ms;
+		}
+
+		#loader.done {
+			opacity: 0;
+			visibility: hidden;
+			pointer-events: none;
+		}
+
+		.loader-inner {
+			display: flex;
+			flex-direction: column;
+			align-items: center;
+			width: min(420px, 100%);
+			animation: rise 700ms cubic-bezier(.2, .7, .2, 1) both;
+		}
+
+		.logo {
+			width: min(320px, 72vw);
+			height: auto;
+			margin-bottom: 44px;
+			animation: breathe 3.2s ease-in-out infinite;
+		}
+
+		.progress {
+			position: relative;
+			width: 100%;
+			height: 3px;
+			border-radius: 3px;
+			background: var(--accent-soft);
+			overflow: hidden;
+		}
+
+		.progress-fill {
+			position: absolute;
+			inset: 0 auto 0 0;
+			width: 0%;
+			border-radius: inherit;
+			background: linear-gradient(90deg, #CBA660, var(--accent) 60%, #EDCC8E);
+			box-shadow: 0 0 12px rgba(226, 190, 120, 0.55);
+			transition: width 250ms ease-out;
+		}
+
+		/* Indeterminate shimmer while the engine initialises after download. */
+		.progress.indeterminate .progress-fill {
+			width: 35% !important;
+			animation: sweep 1.2s ease-in-out infinite;
+		}
+
+		.meta {
+			display: flex;
+			justify-content: space-between;
+			width: 100%;
+			margin-top: 14px;
+			font-size: 12px;
+			letter-spacing: 0.08em;
+			text-transform: uppercase;
+			color: var(--text-muted);
+		}
+
+		.meta .pct {
+			font-variant-numeric: tabular-nums;
+			color: var(--accent);
+		}
+
+		.footer {
+			position: absolute;
+			bottom: 24px;
+			left: 0;
+			right: 0;
+			text-align: center;
+			font-size: 11px;
+			letter-spacing: 0.06em;
+			color: rgba(244, 239, 230, 0.35);
+		}
+
+		/* ---------- Error / warning ---------- */
+
+		#loader.error .progress-fill {
+			background: var(--danger);
+			box-shadow: none;
+			width: 100% !important;
+			animation: none;
+		}
+
+		.error-box {
+			display: none;
+			margin-top: 28px;
+			padding: 14px 16px;
+			width: 100%;
+			box-sizing: border-box;
+			border: 1px solid rgba(235, 122, 110, 0.4);
+			border-radius: 8px;
+			background: rgba(235, 122, 110, 0.08);
+			font-size: 13px;
+			line-height: 1.5;
+			color: var(--text);
+		}
+
+		#loader.error .error-box {
+			display: block;
+		}
+
+		.error-box button {
+			margin-top: 12px;
+			padding: 7px 16px;
+			border: 0;
+			border-radius: 6px;
+			background: var(--accent);
+			color: #1C1405;
+			font: inherit;
+			font-weight: 600;
+			cursor: pointer;
+		}
+
+		.error-box button:hover {
+			background: #EDCC8E;
+		}
+
+		#toast {
+			position: fixed;
+			top: 16px;
+			left: 50%;
+			z-index: 20;
+			max-width: calc(100% - 32px);
+			padding: 10px 16px;
+			box-sizing: border-box;
+			border-radius: 8px;
+			background: rgba(10, 19, 31, 0.92);
+			border: 1px solid rgba(242, 201, 76, 0.4);
+			color: var(--text);
+			font-size: 13px;
+			transform: translate(-50%, -150%);
+			transition: transform 300ms ease;
+		}
+
+		#toast.show {
+			transform: translate(-50%, 0);
+		}
+
+		@keyframes rise {
+			from { opacity: 0; transform: translateY(12px); }
+			to { opacity: 1; transform: none; }
+		}
+
+		@keyframes breathe {
+			0%, 100% { opacity: 1; }
+			50% { opacity: 0.78; }
+		}
+
+		@keyframes sweep {
+			0% { transform: translateX(-100%); }
+			100% { transform: translateX(300%); }
+		}
+
+		@media (prefers-reduced-motion: reduce) {
+			.loader-inner, .logo, .progress.indeterminate .progress-fill { animation: none; }
+			#loader { transition: none; }
 		}
 	</style>
 </head>
 
-<body class="webgl-loading">
-	<div id="gameContainer">
-		<canvas id="unity-canvas" width="960" height="600" data-pixel-art=""></canvas>
-		<script src="Build/ARTEMIS-P15_Webgl.loader.js"></script>
-		<script>
-			var canvas = document.querySelector("#unity-canvas");
+<body>
+	<div id="unity-container">
+		<canvas id="unity-canvas" tabindex="-1" width="960" height="600" data-pixel-art=""></canvas>
+	</div>
+
+	<div id="loader" role="progressbar" aria-label="Loading ARTEMIS-P15" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0">
+		<div class="loader-inner">
+			<img class="logo" src="logo.png" alt="ARTEMIS-P15">
+			<div class="progress" id="progress"><div class="progress-fill" id="progress-fill"></div></div>
+			<div class="meta">
+				<span id="status">Loading</span>
+				<span class="pct" id="pct">0%</span>
+			</div>
+			<div class="error-box" id="error-box">
+				<div id="error-text">Something went wrong while loading.</div>
+				<button type="button" onclick="location.reload()">Try again</button>
+			</div>
+		</div>
+		<div class="footer">NUMENA &middot; v0.4.0</div>
+	</div>
+
+	<div id="toast" role="status"></div>
+
+	<script src="Build/ARTEMIS-P15_Webgl.loader.js"></script>
+	<script>
+		(function () {
+			var canvas = document.getElementById("unity-canvas");
+			var loader = document.getElementById("loader");
+			var progressBar = document.getElementById("progress");
+			var fill = document.getElementById("progress-fill");
+			var pct = document.getElementById("pct");
+			var statusEl = document.getElementById("status");
+			var toast = document.getElementById("toast");
+			var toastTimer = 0;
+
+			function showError(message) {
+				loader.classList.remove("done");
+				loader.classList.add("error");
+				progressBar.classList.remove("indeterminate");
+				statusEl.textContent = "Failed to load";
+				pct.textContent = "";
+				document.getElementById("error-text").textContent = message;
+			}
+
+			function showToast(message) {
+				toast.textContent = message;
+				toast.classList.add("show");
+				clearTimeout(toastTimer);
+				toastTimer = setTimeout(function () { toast.classList.remove("show"); }, 6000);
+			}
+
+			// Unity routes runtime warnings/errors here instead of alert().
+			function unityBanner(message, type) {
+				if (type === "error") showError(message);
+				else showToast(message);
+			}
+
+			// Unity reports download progress up to ~0.9; the tail is engine start-up,
+			// which has no real progress, so switch to an indeterminate sweep there.
+			function onProgress(p) {
+				if (loader.classList.contains("error")) return;
+				var value = Math.min(1, Math.max(0, p));
+				if (value >= 0.9) {
+					progressBar.classList.add("indeterminate");
+					statusEl.textContent = "Starting";
+					pct.textContent = "";
+				} else {
+					var shown = Math.round(value / 0.9 * 100);
+					fill.style.width = shown + "%";
+					pct.textContent = shown + "%";
+					statusEl.textContent = "Downloading";
+					loader.setAttribute("aria-valuenow", shown);
+				}
+			}
+
+			var hasWebGL2 = (function () {
+				try { return !!document.createElement("canvas").getContext("webgl2"); }
+				catch (e) { return false; }
+			})();
+
+			if (!hasWebGL2) {
+				showError("This browser doesn't support WebGL 2. Please open the page in a recent version of Chrome, Edge, Firefox or Safari.");
+				return;
+			}
+
 			var config = {
 				dataUrl: "Build/ARTEMIS-P15_Webgl.data",
 				frameworkUrl: "Build/ARTEMIS-P15_Webgl.framework.js",
@@ -72,65 +322,26 @@
 				streamingAssetsUrl: "StreamingAssets",
 				companyName: "NUMENA",
 				productName: "ARTEMIS-P15",
-				productVersion: "0.3.1",
+				productVersion: "0.4.0",
 				autoSyncPersistentDataPath: true,
+				showBanner: unityBanner,
 			};
-			function progressHandler(progress) {
-				var percent = progress * 100 + '%';
-				canvas.style.background = 'linear-gradient(to right, white, white ' + percent + ', transparent ' + percent + ', transparent) no-repeat center';
-				canvas.style.backgroundSize = '100% 1rem';
-			}
-			var gameLoaded = false;
-			var gameWidth = 960;
-			var gameHeight = 600;
 
-			function onResize() {
-				var container = canvas.parentElement;
-				var w;
-				var h;
-
-				if (!gameLoaded) {
-					w = window.innerWidth;
-					h = window.innerHeight;
-					var r = gameHeight / gameWidth;
-					if (w * r > window.innerHeight) {
-						w = Math.min(w, Math.ceil(h / r));
-					}
-					h = Math.floor(w * r);
-					container.style.top = Math.floor((window.innerHeight - h) / 2) + "px";
-					container.style.left = Math.floor((window.innerWidth - w) / 2) + "px";
-				} else {
-					w = window.innerWidth;
-					h = window.innerHeight;
-					container.style.top = "0px";
-					container.style.left = "0px";
-				}
-
-				container.style.width = canvas.style.width = w + "px";
-				container.style.height = canvas.style.height = h + "px";
-				window.focus();
-			}
-			createUnityInstance(canvas, config, progressHandler).then(function (instance) {
-				canvas = instance.Module.canvas;
-				canvas.style.background = "";
-				canvas.style.backgroundSize = "";
-				document.body.classList.remove("webgl-loading");
-				document.body.classList.add("webgl-loaded");
-				gameLoaded = true;
-				onResize();
+			createUnityInstance(canvas, config, onProgress).then(function (instance) {
+				window.unityInstance = instance;
+				fill.style.width = "100%";
+				// Give Unity one frame to present before revealing the canvas.
+				requestAnimationFrame(function () {
+					requestAnimationFrame(function () {
+						loader.classList.add("done");
+						canvas.focus();
+					});
+				});
+			}).catch(function (err) {
+				showError(String(err && err.message ? err.message : err));
 			});
-			window.addEventListener('resize', onResize);
-			onResize();
-
-			if (/iPhone|iPad|iPod|Android/i.test(navigator.userAgent)) {
-				// Mobile device style: fill the whole browser client area with the game canvas:
-				const meta = document.createElement('meta');
-				meta.name = 'viewport';
-				meta.content = 'width=device-width, height=device-height, initial-scale=1.0, user-scalable=no, shrink-to-fit=yes';
-				document.getElementsByTagName('head')[0].appendChild(meta);
-			}
-		</script>
-	</div>
+		})();
+	</script>
 </body>
 
 </html>
